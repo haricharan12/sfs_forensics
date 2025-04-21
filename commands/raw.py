@@ -1,8 +1,10 @@
 # commands/raw.py - Raw bytes command
 
 from commands.base import Command
+from commands import register
 
-class RawBytesCommand(Command):
+@register()
+class RawCommand(Command):
     @staticmethod
     def get_help() -> str:
         return "Show raw bytes as integers (default: 64)"

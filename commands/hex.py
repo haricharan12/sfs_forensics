@@ -1,8 +1,10 @@
 # commands/hex.py - Hex dump command
 
 from commands.base import Command
+from commands import register
 
-class HexDumpCommand(Command):
+@register()
+class HexCommand(Command):
     @staticmethod
     def get_help() -> str:
         return "Show hex dump of the first bytes (default: 64)"

@@ -1,7 +1,9 @@
 # commands/block.py - Block command
 
 from commands.base import Command
+from commands import register
 
+@register()
 class BlockCommand(Command):
     @staticmethod
     def get_help() -> str:

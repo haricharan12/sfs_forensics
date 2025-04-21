@@ -2,7 +2,9 @@
 
 import os
 from commands.base import Command
+from commands import register
 
+@register()
 class SizeCommand(Command):
     @staticmethod
     def get_help() -> str:

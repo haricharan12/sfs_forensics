@@ -1,7 +1,9 @@
 # commands/flags.py - Flags command
 
 from commands.base import Command
+from commands import register
 
+@register()
 class FlagsCommand(Command):
     @staticmethod
     def get_help() -> str:

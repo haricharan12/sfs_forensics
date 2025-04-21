@@ -4,7 +4,17 @@
 import sys
 import os
 import argparse
+import importlib
+import pkgutil
 from squashfs import SquashFSSuperblock, unpack_squashfs_superblock
+
+# Import all modules in the commands package to ensure decorators are processed
+import commands
+for _, name, _ in pkgutil.iter_modules(commands.__path__):
+    if not name.startswith('__'):  
+        importlib.import_module(f'commands.{name}')
+
+# Access the populated command registry
 from commands import COMMAND_REGISTRY
 
 

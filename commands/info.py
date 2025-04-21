@@ -2,8 +2,10 @@
 
 import time
 from commands.base import Command
+from commands import register
 from squashfs import CompressionID
 
+@register()
 class InfoCommand(Command):
     @staticmethod
     def get_help() -> str:

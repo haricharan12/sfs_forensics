@@ -1,7 +1,9 @@
 # commands/version.py - Version command
 
 from commands.base import Command
+from commands import register
 
+@register()
 class VersionCommand(Command):
     @staticmethod
     def get_help() -> str:

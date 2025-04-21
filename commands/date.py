@@ -2,7 +2,9 @@
 
 import time
 from commands.base import Command
+from commands import register
 
+@register()
 class DateCommand(Command):
     @staticmethod
     def get_help() -> str:

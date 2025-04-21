@@ -1,8 +1,10 @@
 # commands/compression.py - Compression command
 
 from commands.base import Command
+from commands import register
 from squashfs import CompressionID
 
+@register()
 class CompressionCommand(Command):
     @staticmethod
     def get_help() -> str:

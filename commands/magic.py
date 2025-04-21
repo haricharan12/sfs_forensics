@@ -2,8 +2,10 @@
 
 import struct
 from commands.base import Command
+from commands import register
 from squashfs import SQUASHFS_MAGIC
 
+@register()
 class MagicCommand(Command):
     @staticmethod
     def get_help() -> str:

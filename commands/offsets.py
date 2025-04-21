@@ -1,7 +1,9 @@
 # commands/offsets.py - Offsets command
 
 from commands.base import Command
+from commands import register
 
+@register()
 class OffsetsCommand(Command):
     @staticmethod
     def get_help() -> str:

@@ -3,43 +3,33 @@
 # Global command registry
 COMMAND_REGISTRY = {}
 
-def register(name=None):
+def register(*names):
     """
     Decorator to register a command class in the registry.
     
-    Usage:
-        @register()
-        class MyCommand(Command):
+    Args:
+        *names: Optional command names to register. If not provided, 
+                the lowercase name of the class (without 'Command') is used.
+                
+    Example:
+        @register()              # Will register as 'help'
+        class HelpCommand:
             ...
-    
-        @register("custom_name")
-        class MyOtherCommand(Command):
-            ...
-    
-        @register("name1", "name2")  # Register with multiple names
-        class MultiNameCommand(Command):
+            
+        @register('exit', 'quit')  # Will register as both 'exit' and 'quit'
+        class ExitCommand:
             ...
     """
     def decorator(cls):
-        # Get the command name from the class name if not specified
-        if name is None:
-            # Convert CamelCase to lowercase with underscores
-            cmd_name = ''.join(['_' + c.lower() if c.isupper() else c for c in cls.__name__]).lstrip('_')
-            # Remove 'Command' suffix if present
-            cmd_name = cmd_name.replace('_command', '')
+        if not names:
+            # Auto-derive name from class name
+            cmd_name = cls.__name__.lower()
+            if cmd_name.endswith('command'):
+                cmd_name = cmd_name[:-7]  # Remove 'command' suffix
             COMMAND_REGISTRY[cmd_name] = cls
-        elif isinstance(name, str):
-            # Register with the provided name
-            COMMAND_REGISTRY[name] = cls
         else:
-            # Register with multiple names
-            for n in name:
-                COMMAND_REGISTRY[n] = cls
+            # Register with all provided names
+            for name in names:
+                COMMAND_REGISTRY[name] = cls
         return cls
-    
-    # Handle case when called with arguments or directly with class
-    if callable(name):
-        cls = name
-        name = None
-        return decorator(cls)
     return decorator
