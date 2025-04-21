@@ -1,0 +1,110 @@
+.\" Process this file with
+.\" groff -man -Tascii sfsimage.1
+.\"
+.TH SFSIMAGE 1 "JULY 2016" "Sfsimage"
+.SH NAME
+sfsimage \- a tool to manage squashfs forensic evidence containers 
+.SH SYNOPSIS
+.PP
+.B sfsimage
+\-i \fIdevice \fIcontainer.sfs
+.PP
+.B sfsimage
+\-a \fIfilename [...] \fIcontainer.sfs
+.PP
+.B sfsimage
+\-l \fIcontainer.sfs [...]
+.PP
+.B sfsimage
+\-m [\fIcontainer.sfs] [...]
+.PP
+.B sfsimage
+\-u \fIfilename [...] \fIcontainer.sfs
+.SH DESCRIPTION
+.PP
+The sfsimage shell script creates and manages squashfs forensic evidence containers. When imaging, the input can be from a block device (/dev/sdX), a regular file, or stdin. A squashfs compressed filesystem is created containing a the acquired image file. The sfsimage script can add files to a container, list the contents of squashfs containers, and perform mount and unmount operations.
+.TP
+\fB\-i\fR
+images a disk into a newly created *.sfs container
+.TP
+\fB\-a\fR
+adds a file to an existing *.sfs container
+.TP
+\fB\-l\fR
+lists the contents of an existing *.sfs container
+.TP
+\fB\-m\fR
+mounts an *.sfs container in the current directory (without a filename, -m shows all mounted sfs containers)
+.TP
+\fB\-u\fR
+umounts an *.sfs container
+.PP
+.SH FILES
+.PP
+If found, the following configuration files are sourced in this order:
+.IP "/etc/sfsimage.conf"
+System-wide configuration file.
+.IP "~/.sfsimage.conf"
+User configuration file.
+.IP "./sfsimage.conf"
+Directory specific configuration file.
+.PP
+The beginning of the script itself has the default and example settings.
+.PP
+.SH EXAMPLES
+.TP
+To image an attached disk device /dev/sdb into an evidence container called usbstick.sfs:
+.B sfsimage -i /dev/sdb usbstick.sfs
+.TP
+To add a photograph and report to the usbstick evidence container:
+.B sfsimage -a usbstick.jpg evidencereport.pdf usbstick.sfs
+.TP
+To list the contents of the the usbstick.sfs evidence container:
+.B sfsimage -l usbstick.sfs
+.TP
+To mount a squashfs evidence container in the current working directory (creates a ./usbstick.sfs.d directory with the container contents):
+.B sfsimage -m usbstick.sfs
+.TP
+To list all mounted squashfs forensic containers:
+.B sfsimage -m
+.TP
+To umount the squashfs forensic evidence container (removes the usbstick.sfs.d directory):
+.B sfsimage -u usbstick.sfs
+.PP
+.SH MIT License
+
+Copyright (c) 2016 Bruce Nikkel <nikkel@digitalforensics.ch>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+.PP
+.SH DIAGNOSTICS
+Make sure you have squashfs-tools, pv, and a forensic imaging tool (dcfldd, dc3dd, etc.) installed and configured.
+.PP
+.SH SEE ALSO
+.PP
+Visit the sfsimage homepage to check for updates to script:
+.PP
+http://digitalforensics.ch/sfsimage 
+.PP
+.SH AUTHOR
+Written by Bruce Nikkel <nikkel at digitalforensics.ch>
+.PP
+
+

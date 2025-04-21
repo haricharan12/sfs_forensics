@@ -1,0 +1,328 @@
+#!/bin/bash
+
+# MIT License
+# 
+# Copyright (c) 2016 Bruce Nikkel <nikkel@digitalforensics.ch>
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
+# check for updates to script: http://digitalforensics.ch/sfsimage 
+#
+# sfsimage: a script to manage squashfs forensic evidence containers 
+#
+# takes input from a device, a file, or pipe
+# sfsimage -i file.dd image.sfs
+# sfsimage -i /dev/sda image.sfs
+# ewfacquire -u -t - image.E01 | sfsimage -i - image.sfs
+#
+#
+# CHANGELOG:
+# v0.9 2016-07-12 cleanup script for public availability
+# v1.0 2020-02-12 added MIT license
+#
+
+config() {
+
+# this block of code defines the config defaults
+#
+# config overides can be placed in these files, 
+# they will be read in order, with the last one taking precedence:
+#
+# /etc/sfsimage.conf
+# ~/.sfsimage.conf
+# ./sfsimage.conf
+#
+#
+# this command reads an image from a regular file, a block device, or stdin
+# it must send the raw image stream to stdout
+
+# if there are external config files, source them
+# DD is the command to forensically acquire an image
+# variables availale to use:
+# $DDIN is the input file, this could be "-" for stdin, a regular file, or a block dev
+# $LOGDIR is the temp dir where logs (hash, error, etc.) can be written
+# anything written to $LOGDIR will be automatically added to the .sfs file
+# use dcfldd
+# (file names with space should be escape quoted)
+
+# use dc3dd
+DD="dc3dd if=$DDIN log=errorlog.txt hlog=hashlog.txt hash=md5"
+
+# use dcfldd
+#DD="dcfldd if=$DDIN errlog=errorlog.txt hashwindow=10M hashlog=hashlog.txt"
+
+# use plain old dd
+#DD="dd if=$DDIN conv=sync,noerror 2>errorlog.txt| tee >(md5sum > hashlog.txt)"
+
+# use ssh (must use a "-" for the source filename (sfsimage -i - remote-pc.sfs)
+#DD="ssh remote-pc \"dd if=/dev/sdc\""
+
+# default directory to create mountpoints and mount sfs containers
+# "./" will create the mountpoint in the same dir as the *.sfs file
+MNTDIR="./"
+#MNTDIR="/home/investigator/evidence"
+
+# root is needed to access disk devices, and to mount/umount containers
+# if SQSUDO is set, it can automatically escalate privileges if authorized
+SQSUDO="sudo"
+#SQSUDO="su -c"
+
+# set the default user/group/mode for files inside the squashfs container
+SQUSR=`id -nu`
+SQGRP=`id -ng`
+#SQUSR=root
+#SQGRP=root
+SQMODE=444
+}
+
+
+#######################################################################################
+#######################################################################################
+#######################################################################################
+### NO USER CONFIGURABLE SETTINGS AFTER THIS POINT !!!
+#######################################################################################
+#######################################################################################
+#######################################################################################
+
+sq_version="Sfsimage Version 1.0"
+
+exitusage() {
+cat <<EOF
+Sfsimage: a script to manage forensic evidence containers with squashfs
+$sq_version
+Usage:
+       sfsimage -i diskimage container.sfs
+       sfsimage -a file ... container.sfs
+       sfsimage -l container.sfs ...
+       sfsimage -m container.sfs ...
+       sfsimage -m 
+       sfsimage -u container.sfs ...
+Where:
+diskimage is a disk device, regular file, or \"-\" for stdin
+container.sfs is a squashfs forensic evidence container
+file is a regular file to be added to a container
+and the arguments are as follows:
+  -i images a disk into a newly created *.sfs container
+  -a adds a file to an existing *.sfs container
+  -l lists the contents of an existing *.sfs container
+  -m mounts an *.sfs container in the current directory
+  -m without options shows all mounted sfs containers
+  -u umounts an *.sfs container
+
+EOF
+#See sfsimage(1) for more information
+exit 1
+}
+
+exiterror() {
+echo "Sfsimage error: $1" >&2
+exit 1
+}
+
+# check if file exists, has .sfs extension, and is a regular file
+chksfs() {
+  if [[ ! -e "$1" ]]; then
+    echo "$1 does not exist, skipping"
+  elif [[ ! "${1##*.}" = "sfs" ]]; then
+    echo "$1 has no sfs extension, skipping"
+  elif file -b "$1" | grep -v -q "^Squashfs filesystem"; then
+    echo "$1 not a sfs file, skipping"
+  else return 0
+  fi
+  return 1
+}
+
+listsfs() {
+  [[ $numargs = 0 ]] && exitusage
+  for file in "${args[@]}"; do
+    chksfs "$file" || continue
+    echo "Contents of $file:"
+    unsquashfs -ll "$file" | tail -n +4
+  done
+}
+
+mountsfs() {
+  if [[ $numargs = 0 ]]; then
+    echo "Mounted squashfs evidence containers:"
+    mount -t squashfs |grep --color=never "\.sfs.d"
+    return 0
+  fi
+  for file in "${args[@]}"; do
+    if [[ -e "${file}.d" ]]; then
+      echo "${file}.d already exists, not mounting"
+      continue
+    fi
+    chksfs "$file" || continue
+    if [[ ! $(mkdir "${file}.d") ]]; then
+      if [[ ! $($SQSUDO mount "$file" "${file}.d") ]]; then
+        echo "${file}.d mount created"
+      else
+        rmdir "${file}.d"
+        echo "$file failed to mount"
+        continue
+      fi
+    else
+      echo "${file}.d could not be created"
+      continue
+    fi
+  done
+}
+
+umountsfs() {
+  [[ $numargs = 0 ]] && exitusage
+  for mdir in "${args[@]%/}"; do
+    if [[ ! -e "$mdir" ]]; then
+      echo "$mdir does not exist"
+      continue
+    elif [[ "${mdir#*.}" != "sfs.d" ]]; then
+      echo "$mdir has no sfs.d extension, skipping"
+      continue
+    elif ! mountpoint -q "$mdir"; then
+      echo "$mdir not a mountpoint, skipping"
+      continue
+    fi
+    if $SQSUDO umount "$mdir"; then
+	if rmdir "$mdir"; then
+          echo "${mdir} unmounted"
+        else   
+          echo "${mdir} could not be removed (not empty?"
+          continue
+        fi
+    else
+      echo "${mdir} could not be unmounted (still in use?)"
+      continue
+    fi
+  done
+}
+
+addfile() {
+  [[ $numargs < 2 ]] && exitusage
+  dest="${args[-1]}"
+  chksfs "$dest" || exiterror "$dest not a sfs file"
+  for file in "${args[@]}"; do
+    [[ "$dest" = "$file" ]] && continue # ignore destination file
+    [[ ! -f "$file" ]] && continue # ignore not regular files
+    mksquashfs "$file" "$dest" -no-progress -no-fragments |egrep --color=never "^Appending to "
+  done
+}
+
+addimage() {
+  # check for proper parameters and permissions
+  [[ $numargs != 2 ]] && exitusage
+
+  # check the destination
+  dest="${args[1]}"
+  [[ "${dest##*.}" = sfs ]] || exiterror "no .sfs extension on destination."
+  [[ -e "$dest" ]] && exiterror "$dest already exists. Not overwritting."
+
+  # check the source
+  src="${args[0]}"
+  if [ "$src" = "-" ]; then
+    newddin=" "
+  elif [[ ! -r "$src" && -z $SQSUDO ]]; then
+    exiterror "can't read $src"
+  elif [ -f "$src" -o -b "$src" ]; then
+    newif=$(readlink -e "$src")
+    newddin="if=$newif"
+  else
+    exiterror "$src is not a valid device, file, or stdin"
+  fi
+
+  # get the filesize for the progress bar
+  if [ -f "$src" ]; then
+    filesize=$(stat --printf=%s "$src")
+  elif [ -b "$src" ]; then
+	filesize=$($SQSUDO blockdev --getsize64 "$src")
+  else
+	filesize=0
+  fi
+  pv="pv -s $filesize"
+
+  # create temp dir for dd logs and mksquashfs dummy entry
+  sq_dir="${dest}.d"
+  mkdir "$sq_dir" || exiterror "failed to create $sq_dir"
+  rawname="image.raw"
+  filename="${dest##*/}"
+  extension="${filename##*.}"
+  sq_dd="$SQSUDO ${DD/if=$DDIN/$newddin} 2>/dev/null | $pv"
+  sq_start=`date +%Y-%m-%dT%H:%M:%S`
+  sq_pseudo="$rawname f $SQMODE $SQUSR $SQGRP"
+  sq_opts="-no-progress -no-fragments -force-uid $SQUSR -force-gid $SQGRP"
+
+  # log the command, source, destination, and start timestamp
+  log_start="Started: $sq_start
+Sfsimage version: $sq_version
+Sfsimage command: $sq_cmd $SQOPT $args
+Current working directory: $(pwd)
+Forensic evidence source: $newddin
+Destination squashfs container: $dest
+Image filename inside container: $rawname
+Aquisition command: $sq_dd"
+  echo "$log_start"
+  # make the squashfs file with the dd output
+  mkdir "$sq_dir"/dummy || exiterror "failed to create $sq_dir/dummy"
+  mksquashfs "$sq_dir"/dummy "$dest" $sq_opts -p "$sq_pseudo (cd \"$sq_dir\"; $sq_dd)" > /dev/null
+  rmdir "$sq_dir"/dummy
+  sq_finish=$(date +%Y-%m-%dT%H:%M:%S)
+
+  # log the final hash and finish timestamp
+  log_finish="Completed: $sq_finish"
+
+  echo $log_finish
+
+  echo $log_start $log_finish > "$sq_dir"/sfsimagelog.txt
+
+  # add the logs, change the ownership if run via sudo
+  $SQSUDO chmod $SQMODE "$sq_dir"/*
+  $SQSUDO chown $SQUSR:$SQGRP "$sq_dir"/*
+  $SQSUDO mksquashfs "$sq_dir"/* "$dest" >/dev/null
+  if [ ! -z $SUDO_UID ]; then chown $SUDO_UID "$dest"; fi
+  if [ ! -z $SUDO_GID ]; then chgrp $SUDO_GID "$dest"; fi
+
+  # remove the temp dir
+  $SQSUDO rm -rf "$sq_dir" || exiterror "failed to remove $sq_dir"
+}
+
+# globs are expanded by the shell before sfsimage starts
+
+# get command option, arguments
+sq_cmd="$0"
+SQOPT="$1"
+shift
+numargs=$#
+args=("$@")
+
+# set some defaults, then source the config files
+DDIN=$RANDOM$RANDOM$RANDOM # this will be replaced later on
+config
+if [[ -f /etc/sfsimage.conf ]]; then . /etc/sfsimage.conf ;fi
+if [[ -f ~/.sfsimage.conf ]]; then . ~/.sfsimage.conf ;fi
+if [[ -f ./sfsimage.conf ]]; then . ./sfsimage.conf ;fi
+
+case $SQOPT in
+  -i) addimage ;;
+  -a) addfile ;;
+  -l) listsfs ;;
+  -m) mountsfs ;;
+  -u) umountsfs ;;
+   *) exitusage ;;
+esac
+
+exit 0
