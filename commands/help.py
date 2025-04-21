@@ -1,7 +1,7 @@
 # commands/help.py - Help command
 
 from commands.base import Command
-# from commands import COMMAND_REGISTRY
+from commands import COMMAND_REGISTRY
 
 class HelpCommand(Command):
     @staticmethod

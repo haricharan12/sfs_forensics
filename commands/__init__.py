@@ -1,34 +1,45 @@
 # commands/__init__.py - Command registry
 
-from commands.base import Command
-from commands.help import HelpCommand
-from commands.info import InfoCommand
-from commands.date import DateCommand
-from commands.compression import CompressionCommand
-from commands.size import SizeCommand
-from commands.version import VersionCommand
-from commands.block import BlockCommand
-from commands.flags import FlagsCommand
-from commands.offsets import OffsetsCommand
-from commands.hex import HexDumpCommand
-from commands.raw import RawBytesCommand
-from commands.magic import MagicCommand
-from commands.exit import ExitCommand
-
 # Global command registry
-COMMAND_REGISTRY = {
-    "help": HelpCommand,
-    "info": InfoCommand,
-    "date": DateCommand,
-    "compression": CompressionCommand,
-    "size": SizeCommand,
-    "version": VersionCommand,
-    "block": BlockCommand,
-    "flags": FlagsCommand,
-    "offsets": OffsetsCommand,
-    "hex": HexDumpCommand,
-    "raw": RawBytesCommand,
-    "magic": MagicCommand,
-    "exit": ExitCommand,
-    "quit": ExitCommand
-}
+COMMAND_REGISTRY = {}
+
+def register(name=None):
+    """
+    Decorator to register a command class in the registry.
+    
+    Usage:
+        @register()
+        class MyCommand(Command):
+            ...
+    
+        @register("custom_name")
+        class MyOtherCommand(Command):
+            ...
+    
+        @register("name1", "name2")  # Register with multiple names
+        class MultiNameCommand(Command):
+            ...
+    """
+    def decorator(cls):
+        # Get the command name from the class name if not specified
+        if name is None:
+            # Convert CamelCase to lowercase with underscores
+            cmd_name = ''.join(['_' + c.lower() if c.isupper() else c for c in cls.__name__]).lstrip('_')
+            # Remove 'Command' suffix if present
+            cmd_name = cmd_name.replace('_command', '')
+            COMMAND_REGISTRY[cmd_name] = cls
+        elif isinstance(name, str):
+            # Register with the provided name
+            COMMAND_REGISTRY[name] = cls
+        else:
+            # Register with multiple names
+            for n in name:
+                COMMAND_REGISTRY[n] = cls
+        return cls
+    
+    # Handle case when called with arguments or directly with class
+    if callable(name):
+        cls = name
+        name = None
+        return decorator(cls)
+    return decorator
